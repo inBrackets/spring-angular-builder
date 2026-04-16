@@ -46,7 +46,7 @@ def main():
 
     # --- Project metadata (text fields) ---
     group_id = prompt_text("Group ID", metadata["groupId"].get("default", "com.example"))
-    artifact_id = prompt_text("Artifact ID", metadata["artifactId"].get("default", "demo"))
+    artifact_id = prompt_text("Artifact ID", metadata["artifactId"].get("default", "spring-angular-builder-output"))
     name = prompt_text("Project Name", artifact_id)
     description = prompt_text("Description", metadata["description"].get("default", "Demo project for Spring Boot"))
     package_name = prompt_text("Package Name", f"{group_id}.{artifact_id}")
