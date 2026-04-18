@@ -2,7 +2,7 @@ import sys
 
 from spring_builder.api import fetch_metadata, download_project, normalize_boot_version
 from spring_builder.prompts import prompt_single_select, prompt_text, prompt_dependencies
-from spring_builder.project import extract_project, build_and_test
+from spring_builder.project import extract_project, build_and_test, generate_github_actions
 
 
 def main():
@@ -57,7 +57,7 @@ def main():
     dependencies = prompt_dependencies(dep_groups)
 
     # --- Output directory ---
-    output_dir = prompt_text("Output directory", artifact_id)
+    output_dir = prompt_text("Output directory", "spring-angular-builder-output")
 
     # --- Summary ---
     print(f"\n{'='*60}")
@@ -107,6 +107,9 @@ def main():
 
     # --- Build & test ---
     build_and_test(output_dir, project_type)
+
+    # --- Generate CI workflow ---
+    generate_github_actions(output_dir, project_type, java_version)
 
 
 if __name__ == "__main__":
