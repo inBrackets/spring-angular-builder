@@ -18,6 +18,15 @@ def prompt_single_select(label, options, default_id=None):
         print("Invalid choice, try again.")
 
 
+def prompt_yes_no(label, default=True):
+    """Prompt for a yes/no question."""
+    suffix = " [Y/n]" if default else " [y/N]"
+    raw = input(f"\n{label}{suffix}: ").strip().lower()
+    if raw == "":
+        return default
+    return raw in ("y", "yes")
+
+
 def prompt_text(label, default=""):
     """Prompt for free-text input with a default."""
     suffix = f" [{default}]" if default else ""

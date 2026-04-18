@@ -1,13 +1,13 @@
 import sys
-
 from spring_builder.api import fetch_metadata, download_project, normalize_boot_version
-from spring_builder.prompts import prompt_single_select, prompt_text, prompt_dependencies
+from spring_builder.prompts import prompt_single_select, prompt_text, prompt_dependencies, prompt_yes_no
+from spring_builder.angular import generate_angular_frontend
 from spring_builder.project import extract_project, build_and_test, generate_github_actions
 
 
 def main():
     print("=" * 60)
-    print("  Spring Boot Project Generator")
+    print("  Spring Boot + Angular Project Generator")
     print("  (powered by start.spring.io)")
     print("=" * 60)
 
@@ -56,6 +56,9 @@ def main():
     dep_groups = metadata["dependencies"]["values"]
     dependencies = prompt_dependencies(dep_groups)
 
+    # --- Angular frontend ---
+    angular = prompt_yes_no("Include Angular frontend")
+
     # --- Output directory ---
     output_dir = prompt_text("Output directory", "spring-angular-builder-output")
 
@@ -75,6 +78,7 @@ def main():
     print(f"  Package:       {package_name}")
     print(f"  Version:       {version}")
     print(f"  Dependencies:  {', '.join(dependencies) if dependencies else 'none'}")
+    print(f"  Angular:       {'yes' if angular else 'no'}")
     print(f"  Output:        {output_dir}")
     print(f"{'='*60}")
 
@@ -105,11 +109,15 @@ def main():
     zip_data = download_project(params)
     extract_project(zip_data, output_dir)
 
+    # --- Generate Angular frontend ---
+    if angular:
+        generate_angular_frontend(output_dir, project_type)
+
     # --- Build & test ---
     build_and_test(output_dir, project_type)
 
     # --- Generate CI workflow ---
-    generate_github_actions(output_dir, project_type, java_version)
+    generate_github_actions(output_dir, project_type, java_version, angular=angular)
 
 
 if __name__ == "__main__":

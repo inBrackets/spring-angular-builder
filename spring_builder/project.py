@@ -3,14 +3,23 @@ import shutil
 import stat
 import subprocess
 import sys
+import time
 import zipfile
 from io import BytesIO
 
 
 def _remove_readonly(func, path, _exc_info):
-    """Clear read-only flag and retry removal (needed for .git on Windows)."""
+    """Clear read-only flag and retry removal, with retries for locked files on Windows."""
     os.chmod(path, stat.S_IWRITE)
-    func(path)
+    for attempt in range(5):
+        try:
+            func(path)
+            return
+        except PermissionError:
+            if attempt < 4:
+                time.sleep(1)
+            else:
+                raise
 
 
 def _clear_directory(target_dir):
@@ -65,7 +74,7 @@ def build_and_test(project_dir, project_type):
     result = subprocess.run(
         cmd,
         cwd=abs_dir,
-        timeout=300,
+        timeout=600,
     )
 
     if result.returncode == 0:
@@ -79,7 +88,7 @@ def build_and_test(project_dir, project_type):
         sys.exit(result.returncode)
 
 
-def generate_github_actions(project_dir, project_type, java_version):
+def generate_github_actions(project_dir, project_type, java_version, angular=False):
     """Generate a GitHub Actions workflow that runs tests on push and manual trigger."""
     abs_dir = os.path.abspath(project_dir)
     workflows_dir = os.path.join(abs_dir, ".github", "workflows")
@@ -94,6 +103,55 @@ def generate_github_actions(project_dir, project_type, java_version):
         cache = "gradle"
         report_paths = "**/build/test-results/test/TEST-*.xml"
 
+    if angular:
+        permissions = """permissions:
+  contents: read
+  checks: write
+  pages: write
+  id-token: write"""
+        deploy_job = """
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build Angular app
+        working-directory: frontend
+        run: npm run build -- --base-href /$(echo ${{ github.repository }} | cut -d'/' -f2)/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: src/main/resources/static
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+"""
+    else:
+        permissions = """permissions:
+  contents: read
+  checks: write"""
+        deploy_job = ""
+
     workflow = f"""name: Java CI
 
 on:
@@ -103,9 +161,7 @@ on:
     branches: [ "**" ]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  checks: write
+{permissions}
 
 jobs:
   test:
@@ -133,7 +189,7 @@ jobs:
           name: Test Results
           path: '{report_paths}'
           reporter: java-junit
-"""
+{deploy_job}"""
 
     workflow_path = os.path.join(workflows_dir, "ci.yml")
     with open(workflow_path, "w", newline="\n") as f:
